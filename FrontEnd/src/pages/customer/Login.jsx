@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // Added Link import
 import axios from "axios";
 import logo from "../../image/image.png"; 
 
 const Login = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ 
-    email: "", 
-    password: "", 
-    role: "user" // Default to user
-  });
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    role: "user", // Default selection
+  });
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -18,91 +20,147 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Choose the endpoint based on the selected entity
-    const endpoint = form.role === "organizer" 
-      ? "http://localhost:5000/organizerLogin" 
-      : "http://localhost:5000/userLogin";
+    setLoading(true);
 
     try {
-      const response = await axios.post(endpoint, {
-        email: form.email,
-        password: form.password,
-      });
+      // 1. Determine Endpoints based on Role
+      const endpoint = form.role === "organizer" 
+        ? "http://localhost:5000/organizerLogin" 
+        : "http://localhost:5000/userLogin";
 
+      // 2. Prepare Payload (Organizers often use 'organizerEmail' in backend)
+      const payload = form.role === "organizer" 
+        ? { organizerEmail: form.email, password: form.password } 
+        : { email: form.email, password: form.password };
+
+      const response = await axios.post(endpoint, payload);
+
+      // 3. Store Data in LocalStorage
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("role", form.role);
+      
+      // Save specific user/organizer details
+      const profileData = form.role === "organizer" ? response.data.organizer : response.data.user;
+      localStorage.setItem("user", JSON.stringify(profileData));
 
       alert("Login successful!");
-      // Redirect based on entity
-      navigate(form.role === "organizer" ? "/organizer-home" : "/home");
+
+      // 4. Navigate to correct Dashboard
+      if (form.role === "organizer") {
+        navigate("/organizer-home");
+      } else {
+        navigate("/home");
+      }
+      
     } catch (error) {
-      alert(error.response?.data?.message || "Invalid email or password");
+      console.error("Login Error:", error);
+      alert(error.response?.data?.message || "Invalid credentials. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl text-white">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 font-sans text-white">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
         
-        <div className="flex justify-center mb-6">
-          <img src={logo} alt="Eventra Logo" className="h-20 w-auto object-contain mix-blend-screen" />
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <img src={logo} alt="Eventra Logo" className="h-20 w-auto object-contain" />
         </div>
 
-        <h2 className="text-2xl font-bold mb-6 text-center">Login to Eventra</h2>
+        <h2 className="text-3xl font-bold mb-2 text-center">Welcome Back</h2>
+        <p className="text-slate-400 text-center mb-8 text-sm">Log in to manage your events</p>
 
-        {/* Entity/Role Toggle */}
-        <div className="flex bg-slate-950 p-1 rounded-lg mb-6 border border-slate-800">
+        {/* Role Switcher */}
+        <div className="flex bg-slate-950 p-1 rounded-xl mb-8 border border-slate-800">
           <button
+            type="button"
             onClick={() => setForm({...form, role: "user"})}
-            className={`flex-1 py-2 rounded-md transition ${form.role === "user" ? "bg-blue-600" : "hover:bg-slate-800"}`}
+            className={`flex-1 py-2.5 rounded-lg font-semibold transition-all ${
+              form.role === "user" ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:text-white"
+            }`}
           >
             User
           </button>
           <button
+            type="button"
             onClick={() => setForm({...form, role: "organizer"})}
-            className={`flex-1 py-2 rounded-md transition ${form.role === "organizer" ? "bg-blue-600" : "hover:bg-slate-800"}`}
+            className={`flex-1 py-2.5 rounded-lg font-semibold transition-all ${
+              form.role === "organizer" ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:text-white"
+            }`}
           >
             Organizer
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
-          />
-          <div className="relative">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Email Address</label>
             <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder="Password"
+              type="email"
+              name="email"
+              placeholder="name@company.com"
+              value={form.email}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none transition"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2 text-blue-500 text-sm"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
+          </div>
+
+          <div>
+            {/* Added Flex container to put label and link on the same line */}
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-sm font-medium text-slate-400 uppercase tracking-wider">Password</label>
+              <Link 
+                to="/forgot-password" 
+                className="text-xs font-bold text-blue-500 hover:text-blue-400 transition"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+            
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-500 text-xs font-bold uppercase hover:text-blue-400"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
           
-          <button className="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold transition mt-2">
-            Login
+          <button 
+            type="submit"
+            disabled={loading}
+            className={`w-full py-4 rounded-xl font-bold transition-all mt-4 flex items-center justify-center gap-2 ${
+              loading ? "bg-blue-800 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+            }`}
+          >
+            {loading ? (
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-slate-400 mt-4 text-sm">
+        <p className="text-center text-slate-500 mt-8 text-sm">
           Don't have an account?{" "}
-          <button onClick={() => navigate("/register")} className="text-blue-500 hover:underline">
-            Register
+          <button 
+            onClick={() => navigate("/register")} 
+            className="text-blue-500 font-bold hover:underline"
+          >
+            Register Now
           </button>
         </p>
       </div>

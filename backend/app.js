@@ -2,8 +2,12 @@ const express = require("express");
 const dotenv = require("dotenv");
 const connectDB = require("./database/databaseConnection");
 const cors = require("cors");
+
+// --- ROUTE IMPORTS ---
 const organizerRoute = require("./routes/organizerRoutes");
 const userRoute = require("./routes/userRoutes");
+const eventRouter = require("./routes/eventRoutes");
+const productRouter = require("./routes/productRoute"); // Router import gareko
 
 // Load environment variables
 dotenv.config();
@@ -13,26 +17,29 @@ connectDB();
 
 const app = express();
 
-// Middleware
+// --- MIDDLEWARE ---
 app.use(cors({
-  origin: "http://localhost:5173", // EXACTLY match your frontend URL (no trailing slash)
+  origin: "http://localhost:5173", 
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
-app.use(express.json()); // Essential: allows reading JSON from req.body
 
-// Route Definitions
-// All user-related routes will be prefixed with /api/users
+app.use(express.json()); 
+app.use(express.urlencoded({ extended: true }));
+
+// --- ROUTE DEFINITIONS (Direct Routes) ---
+
 app.use("", userRoute);
-
-// All organizer-related routes will be prefixed with /api/organizers
 app.use("", organizerRoute);
+app.use("", eventRouter);
+app.use("", productRouter); // This will/add, /update/
 
 app.get("/", (req, res) => {
   res.send("Welcome to Eventra API");
 });
 
+// --- SERVER START ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-  console.log(`Server running on port ${PORT}`)
+  console.log(`🚀 Server running on port ${PORT}`)
 );

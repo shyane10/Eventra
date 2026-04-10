@@ -1,28 +1,22 @@
 const express = require("express");
-const {login, verifyOtp, registerRequest } = require("../controller/auth/authController");
+const { 
+    verifyOtp, 
+    userRegister, 
+    userLogin, 
+    logout, 
+    forgotPassword, 
+    resetPassword 
+} = require("../controller/auth/authController");
 const router = express.Router();
 
-
 // ====== User Auth Routes ======
-
-// Register a new user
-// router.post("/register", authController.userRegister);
-router.route("/userRegister").post(registerRequest);
-
+router.route("/userRegister").post(userRegister);
 router.route("/verifyOtp").post(verifyOtp);
+router.route("/userLogin").post(userLogin);
+router.route("/logout").post(logout);
 
-router.route("/userLogin").post(login);
-
-
-
-
-// // Forgot password
-// router.post("/forgot-password", authController.forgotPassword);
-
-// // Verify OTP
-// router.post("/verify-otp", authController.verifyOtp);
-
-// // Reset password
-// router.post("/reset-password", authController.resetPassword);
+// Forgot Password Routes
+router.route("/forgotPassword").post(forgotPassword);
+router.route("/resetPassword").post(resetPassword);
 
 module.exports = router;

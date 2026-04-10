@@ -35,6 +35,7 @@ const Register = () => {
       let payload = {};
 
       if (form.role === "organizer") {
+        // Organizer endpoint (Prefix check garnu hola: /api/organizer/organizerRegister)
         endpoint = "http://localhost:5000/organizerRegister";
         payload = {
           organizerName: form.name,
@@ -44,6 +45,7 @@ const Register = () => {
           phoneNumber: form.phoneNumber,
         };
       } else {
+        // User endpoint (Prefix check garnu hola: /api/user/userRegister)
         endpoint = "http://localhost:5000/userRegister";
         payload = {
           name: form.name,
@@ -54,53 +56,100 @@ const Register = () => {
 
       const response = await axios.post(endpoint, payload);
 
-      alert(response.data.message);
+      alert(response.data.message || "Registration successful!");
+      
       // Navigate to OTP page, passing the email for verification
+      // State ma pathau-da email field match hunu parcha
       navigate("/verify-otp", { state: { email: form.email } });
       
     } catch (error) {
+      console.error("Registration Error:", error);
       alert(error.response?.data?.message || "Registration failed. Please check the console.");
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl text-white">
+    <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center px-4 py-12 font-sans">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl text-white">
+        
         <div className="flex justify-center mb-6">
-          <img src={logo} alt="Eventra Logo" className="h-20 w-auto object-contain mix-blend-screen" />
+          <img src={logo} alt="Eventra Logo" className="h-20 w-auto object-contain" />
         </div>
 
-        <h2 className="text-2xl font-bold mb-6 text-center">Create Account</h2>
+        <h2 className="text-3xl font-bold mb-2 text-center">Join Eventra</h2>
+        <p className="text-slate-400 text-center mb-8 text-sm">Create your account to get started</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="text" name="name" placeholder="Full Name" onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
-          <input type="email" name="email" placeholder="Email" onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
-          
-          <select name="role" onChange={handleChange} className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white">
-            <option value="user">Standard User</option>
-            <option value="organizer">Event Organizer</option>
-          </select>
+          {/* Full Name */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Full Name</label>
+            <input type="text" name="name" placeholder="John Doe" value={form.name} onChange={handleChange} required className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none transition" />
+          </div>
 
+          {/* Email */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
+            <input type="email" name="email" placeholder="john@example.com" value={form.email} onChange={handleChange} required className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none transition" />
+          </div>
+          
+          {/* Role Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Account Type</label>
+            <select name="role" value={form.role} onChange={handleChange} className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+              <option value="user">Standard User</option>
+              <option value="organizer">Event Organizer</option>
+            </select>
+          </div>
+
+          {/* Organizer Specific Fields */}
           {form.role === "organizer" && (
-            <div className="space-y-4 p-4 border border-blue-600/30 rounded-lg bg-blue-950/20">
-              <input type="text" name="venue" placeholder="Venue Name" onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
-              <input type="number" name="phoneNumber" placeholder="Phone Number" onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
+            <div className="space-y-4 p-4 border border-blue-600/20 rounded-xl bg-blue-600/5 animate-in fade-in duration-300">
+              <div>
+                <label className="block text-xs font-semibold text-blue-400 mb-1 uppercase">Venue Location</label>
+                <input type="text" name="venue" placeholder="Hotel Yak & Yeti" value={form.venue} onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-blue-400 mb-1 uppercase">Contact Number</label>
+                <input type="number" name="phoneNumber" placeholder="98XXXXXXXX" value={form.phoneNumber} onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
+              </div>
             </div>
           )}
 
-          <input type={showPassword ? "text" : "password"} name="password" placeholder="Password" onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
-          <input type="password" name="confirmPassword" placeholder="Confirm Password" onChange={handleChange} required className="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white" />
+          {/* Password */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase">Password</label>
+              <input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" value={form.password} onChange={handleChange} required className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase">Confirm</label>
+              <input type="password" name="confirmPassword" placeholder="••••••••" value={form.confirmPassword} onChange={handleChange} required className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <input type="checkbox" id="show" onChange={() => setShowPassword(!showPassword)} className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-blue-600" />
+            <label htmlFor="show" className="text-xs text-slate-400 cursor-pointer">Show Password</label>
+          </div>
           
-          <button disabled={loading} className="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold transition mt-2">
-            {loading ? "Registering..." : "Register"}
+          <button 
+            type="submit"
+            disabled={loading} 
+            className={`w-full py-3.5 rounded-xl font-bold transition-all mt-4 flex items-center justify-center gap-2 ${
+              loading ? "bg-blue-800 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+            }`}
+          >
+            {loading ? (
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : "Create Account"}
           </button>
         </form>
 
-        <p className="text-center text-slate-400 mt-6 text-sm">
-          Already have an account? <button onClick={() => navigate("/")} className="text-blue-500 hover:underline">Login</button>
+        <p className="text-center text-slate-400 mt-8 text-sm">
+          Already have an account?{" "}
+          <button onClick={() => navigate("/")} className="text-blue-500 font-bold hover:underline">Sign In</button>
         </p>
       </div>
     </div>

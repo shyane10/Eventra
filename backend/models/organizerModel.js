@@ -26,7 +26,7 @@ const organizerSchema = new Schema({
   otp: {
     type: Number
   },
-  isOtpVerified: {
+  isEmailVerified: {
     type: Boolean,
     default: false
   }

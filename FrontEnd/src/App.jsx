@@ -1,36 +1,80 @@
 // src/App.jsx
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+
+// CUSTOMER PAGES
 import Login from "./pages/customer/Login";
 import Register from "./pages/customer/Register";
 import VerifyOtp from "./pages/customer/VerifyOtp";
-import Navbar from "./components/Nav";
-import Home from "./pages/customer/Home"
+// CRITICAL: Make sure the file in your folder is named ForgotPassword.jsx
+import ForgotPassword from "./pages/customer/ForgetPassword"; 
+import ResetPassword from "./pages/customer/ResetPassword"; 
 
-// A helper component to handle conditional rendering of the Navbar
-const NavigationWrapper = () => {
+import Navbar from "./components/Nav";
+import Footer from "./components/Footer";
+import Home from "./pages/customer/Home";
+import Book from "./pages/customer/Book"; 
+import Contact from "./pages/customer/Contact";
+import UpcomingEvents from "./pages/customer/UpcomingEvents";
+import PastEvents from "./pages/customer/PastEvents";
+import Shop from "./pages/customer/Shop";
+
+// ORGANIZER PAGES
+import OrganizerDB from "./pages/organizer/OrganizerDB";
+import CreateEvent from "./pages/organizer/CreateEvent";
+import CreateProduct from "./pages/organizer/CreateProduct";
+
+const LayoutWrapper = ({ children }) => {
   const location = useLocation();
 
-  // Define paths where you DON'T want the navbar to appear
-  // Added "/verify-otp" to this list so it stays hidden there
-  const hideNavbarPaths = ["/", "/register", "/verify-otp"];
-  const shouldHideNavbar = hideNavbarPaths.includes(location.pathname);
+  const hideLayoutPaths = [
+    "/", 
+    "/register", 
+    "/verify-otp", 
+    "/forgot-password", 
+    "/reset-password",
+    "/organizer-home", 
+    "/create-event",
+    "/create-product" 
+  ];
+  
+  const shouldHide = hideLayoutPaths.includes(location.pathname);
 
-  return !shouldHideNavbar ? <Navbar /> : null;
+  return (
+    <>
+      {!shouldHide && <Navbar />}
+      <main className="flex-grow">{children}</main>
+      {!shouldHide && <Footer />}
+    </>
+  );
 };
 
 function App() {
   return (
     <BrowserRouter>
-      {/* Navbar wrapper */}
-      <NavigationWrapper />
+      <LayoutWrapper>
+        <Routes>
+          {/* --- AUTH ROUTES --- */}
+          <Route path="/" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          
+          {/* --- CUSTOMER / USER ROUTES --- */}
+          <Route path="/home" element={<Home />} />
+          <Route path="/booking" element={<Book />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/shop" element={<Shop />} />
+          
+          <Route path="/events/upcoming" element={<UpcomingEvents />} />
+          <Route path="/events/past" element={<PastEvents />} />
 
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/verify-otp" element={<VerifyOtp />} />
-        <Route path="/home" element={<Home />} />
-        {/* Add more routes later as needed */}
-      </Routes>
+          {/* --- ORGANIZER ROUTES --- */}
+          <Route path="/organizer-home" element={<OrganizerDB />} />
+          <Route path="/create-event" element={<CreateEvent />} />
+          <Route path="/create-product" element={<CreateProduct />} />
+        </Routes>
+      </LayoutWrapper>
     </BrowserRouter>
   );
 }

@@ -20,7 +20,17 @@ const userSchema = new mongoose.Schema({
   isEmailVerified: {
     type: Boolean,
     default: false
+  },
+  // --- ADDED FOR FORGOT PASSWORD ---
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
   }
+  // ---------------------------------
 }, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);

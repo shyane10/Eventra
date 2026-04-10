@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios"; // Added axios
 
 const Home = () => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+
+  // --- NEW STATE FOR DYNAMIC EVENTS ---
+  const [dynamicEvents, setDynamicEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const slides = [
     {
@@ -18,25 +23,44 @@ const Home = () => {
       title: "Host Your Own Experience.",
       subtitle: "Join 500+ organizers managing events with Eventra tools.",
       btnText: "Start Organizing",
-      image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=2070",
+      image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070",
       tag: "FOR ORGANIZERS"
     },
     {
       title: "Exclusive Tech Summits.",
-      subtitle: "Book your seats for the biggest 2026 Networking events.",
+      subtitle: "Book your seats for the biggest 2026 events.",
       btnText: "View Schedule",
-      image: "https://images.unsplash.com/photo-1540575861501-7ad0582371f3?q=80&w=2070",
+      image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=2070",
       tag: "TECH 2026"
     }
   ];
 
-  const featuredEvents = [
-    { title: "Tech Conference 2026", date: "12 June", location: "Kathmandu", image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678" },
-    { title: "Music Festival", date: "28 July", location: "Pokhara", image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745" },
-    { title: "Startup Meetup", date: "5 Aug", location: "Lalitpur", image: "https://images.unsplash.com/photo-1511578314322-379afb476865" },
-  ];
+  // --- FETCH DYNAMIC EVENTS LOGIC ---
+  useEffect(() => {
+    const fetchHomeEvents = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/all");
+        const eventArray = Array.isArray(res.data) 
+          ? res.data 
+          : res.data.events || res.data.data || [];
 
-  // Auto-play logic (optional)
+        // Show only the 3 most recent upcoming events
+        const now = new Date();
+        const upcoming = eventArray
+          .filter(event => new Date(event.startDate) >= now)
+          .slice(0, 3); // Limit to 3 for the home grid
+        
+        setDynamicEvents(upcoming);
+      } catch (err) {
+        console.error("Error loading home events:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHomeEvents();
+  }, []);
+
+  // Auto-play logic
   useEffect(() => {
     const timer = setInterval(() => {
       nextSlide();
@@ -50,27 +74,6 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       
-      {/* Sidebar Trigger */}
-      <button 
-        onClick={() => setMenuOpen(true)}
-        className="fixed top-6 right-6 z-50 bg-white shadow-xl p-4 rounded-2xl hover:scale-110 transition-transform border border-slate-100"
-      >
-        <div className="space-y-1.5">
-          <span className="block w-6 h-0.5 bg-blue-600"></span>
-          <span className="block w-6 h-0.5 bg-blue-600"></span>
-          <span className="block w-4 h-0.5 bg-blue-600"></span>
-        </div>
-      </button>
-
-      {/* Sidebar Menu */}
-      <div className={`fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-[60] transform ${menuOpen ? "translate-x-0" : "-translate-x-full"} transition-transform duration-300 border-r border-slate-100`}>
-        <div className="flex justify-between items-center px-8 py-6 border-b">
-          <h2 className="text-2xl font-black text-blue-600">EVENTRA</h2>
-          <button onClick={() => setMenuOpen(false)} className="text-slate-400 text-2xl font-light">✕</button>
-        </div>
-        
-      </div>
-
       {/* Banner Slider Section */}
       <header className="px-6 pt-10 pb-6">
         <div className="max-w-7xl mx-auto relative group h-[500px] md:h-[600px] overflow-hidden rounded-[3rem] shadow-2xl">
@@ -105,7 +108,7 @@ const Home = () => {
             </div>
           ))}
 
-          {/* Slider Controls (Arrows) */}
+          {/* Slider Controls */}
           <button onClick={prevSlide} className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 p-3 rounded-full backdrop-blur-md z-20 opacity-0 group-hover:opacity-100 transition-opacity">
              <span className="text-2xl text-white">←</span>
           </button>
@@ -126,30 +129,44 @@ const Home = () => {
         </div>
       </header>
 
-      {/* Featured Events Grid */}
+      {/* Featured Events Grid - NOW DYNAMIC */}
       <main className="max-w-7xl mx-auto px-6 py-12">
         <h2 className="text-4xl font-black text-slate-800 tracking-tight mb-10 text-center">Upcoming Events</h2>
         
-        <div className="grid md:grid-cols-3 gap-10">
-          {featuredEvents.map((event, i) => (
-            <div key={i} className="group cursor-pointer">
-              <div className="relative overflow-hidden rounded-[2.5rem] shadow-sm mb-6 border border-slate-100">
-                <img 
-                  src={event.image} 
-                  alt={event.title} 
-                  className="h-72 w-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                />
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-xs font-black text-blue-600">
-                  {event.date}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-10">
+            {dynamicEvents.length > 0 ? (
+              dynamicEvents.map((event, i) => (
+                <div key={i} className="group cursor-pointer" onClick={() => navigate(`/event/${event._id}`)}>
+                  <div className="relative overflow-hidden rounded-[2.5rem] shadow-sm mb-6 border border-slate-100">
+                    <img 
+                      // Updated to use dynamic image path (Cloudinary)
+                      src={event.eventImage} 
+                      alt={event.title} 
+                      className="h-72 w-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                      onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1501386761578-eac5c94b800a"; }}
+                    />
+                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-xs font-black text-blue-600 shadow-lg">
+                      {new Date(event.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors line-clamp-1">
+                    {event.title}
+                  </h3>
+                  <p className="text-slate-500 font-bold flex items-center gap-2">
+                    <span className="text-blue-500">📍</span> {event.venueName || "Nepal"}
+                  </p>
                 </div>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors">{event.title}</h3>
-              <p className="text-slate-500 font-bold flex items-center gap-2">
-                <span className="text-blue-500">📍</span> {event.location}
-              </p>
-            </div>
-          ))}
-        </div>
+              ))
+            ) : (
+              <p className="col-span-3 text-center text-slate-400 py-10 font-medium">No events found at the moment.</p>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Footer */}
