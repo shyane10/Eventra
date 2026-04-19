@@ -35,8 +35,7 @@ const Register = () => {
       let payload = {};
 
       if (form.role === "organizer") {
-        // Organizer endpoint (Prefix check garnu hola: /api/organizer/organizerRegister)
-        endpoint = "http://localhost:5000/organizerRegister";
+        endpoint = "http://localhost:5000/api/organizer/organizerRegister";
         payload = {
           organizerName: form.name,
           organizerEmail: form.email,
@@ -45,8 +44,7 @@ const Register = () => {
           phoneNumber: form.phoneNumber,
         };
       } else {
-        // User endpoint (Prefix check garnu hola: /api/user/userRegister)
-        endpoint = "http://localhost:5000/userRegister";
+        endpoint = "http://localhost:5000/api/auth/userRegister";
         payload = {
           name: form.name,
           email: form.email,  
@@ -60,7 +58,7 @@ const Register = () => {
       
       // Navigate to OTP page, passing the email for verification
       // State ma pathau-da email field match hunu parcha
-      navigate("/verify-otp", { state: { email: form.email } });
+      navigate("/verify-otp", { state: { email: form.email, role: form.role } });
       
     } catch (error) {
       console.error("Registration Error:", error);

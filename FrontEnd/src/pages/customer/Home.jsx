@@ -9,55 +9,73 @@ const Home = () => {
 
   // --- NEW STATE FOR DYNAMIC EVENTS ---
   const [dynamicEvents, setDynamicEvents] = useState([]);
+  const [dynamicProducts, setDynamicProducts] = useState([]); // New state for products
   const [loading, setLoading] = useState(true);
 
-  const slides = [
-    {
-      title: "One Platform. All Your Events.",
-      subtitle: "Discover the most anticipated concerts and festivals in Nepal.",
-      btnText: "Explore Now",
-      image: "https://images.unsplash.com/photo-1459749411177-042180ce673c?q=80&w=2070",
-      tag: "FEATURED"
-    },
-    {
-      title: "Host Your Own Experience.",
-      subtitle: "Join 500+ organizers managing events with Eventra tools.",
-      btnText: "Start Organizing",
-      image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070",
-      tag: "FOR ORGANIZERS"
-    },
-    {
-      title: "Exclusive Tech Summits.",
-      subtitle: "Book your seats for the biggest 2026 events.",
-      btnText: "View Schedule",
-      image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=2070",
-      tag: "TECH 2026"
-    }
-  ];
+  // 1. DYNAMIC SLIDES CALCULATION
+  const getSlides = () => {
+    const baseSlides = [
+      {
+        title: dynamicEvents[0]?.title || "One Platform. All Your Events.",
+        subtitle: dynamicEvents[0]?.description ? (dynamicEvents[0].description.substring(0, 100) + '...') : "Discover the most anticipated concerts and festivals in Nepal.",
+        btnText: dynamicEvents[0] ? "Book Now" : "Explore Now",
+        image: dynamicEvents[0]?.eventImage || "https://images.unsplash.com/photo-1459749411177-042180ce673c?q=80&w=2070",
+        tag: dynamicEvents[0] ? "DYNAMNIC HIGHLIGHT" : "FEATURED",
+        link: dynamicEvents[0] ? "/booking" : "/events/upcoming",
+        eventData: dynamicEvents[0] // Pass the full event object
+      },
+      {
+        title: "Host Your Own Experience.",
+        subtitle: "Join 500+ organizers managing events with Eventra tools.",
+        btnText: "Start Organizing",
+        image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070",
+        tag: "FOR ORGANIZERS",
+        link: "organizer-logic" // Special flag
+      },
+      {
+        title: "Exclusive Merchandise Shop",
+        subtitle: "One-click checkout for exclusive artist drops and band tees.",
+        btnText: "Go to Shop",
+        image: dynamicProducts[0]?.image || "https://images.unsplash.com/photo-1514525253361-b83f859b73c0?q=80&w=2070",
+        tag: "OFFICIAL SHOP",
+        link: "/shop"
+      }
+    ];
+    return baseSlides;
+  };
+
+  const slides = getSlides();
 
   // --- FETCH DYNAMIC EVENTS LOGIC ---
   useEffect(() => {
-    const fetchHomeEvents = async () => {
+    const fetchHomeData = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/all");
-        const eventArray = Array.isArray(res.data) 
-          ? res.data 
-          : res.data.events || res.data.data || [];
+        const [eventRes, productRes] = await Promise.all([
+          axios.get("http://localhost:5000/api/events/all"),
+          axios.get("http://localhost:5000/api/products")
+        ]);
 
-        // Show only the 3 most recent upcoming events
+        // Process Events
+        const eventArray = Array.isArray(eventRes.data) 
+          ? eventRes.data 
+          : eventRes.data.events || eventRes.data.data || [];
         const now = new Date();
         const upcoming = eventArray
           .filter(event => new Date(event.startDate) >= now)
-          .slice(0, 3); // Limit to 3 for the home grid
-        
+          .slice(0, 3);
         setDynamicEvents(upcoming);
+
+        // Process Products
+        const productArray = Array.isArray(productRes.data) ? productRes.data : [];
+        setDynamicProducts(productArray);
+
       } catch (err) {
-        console.error("Error loading home events:", err);
+        console.error("Error loading home data:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchHomeEvents();
+    fetchHomeData();
   }, []);
 
   // Auto-play logic
@@ -70,6 +88,26 @@ const Home = () => {
 
   const nextSlide = () => setActiveSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
   const prevSlide = () => setActiveSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
+
+  // --- BUTTON ACTION HANDLER ---
+  const handleSlideAction = (slide) => {
+    const { link, eventData } = slide;
+    
+    if (link === "organizer-logic") {
+      const role = localStorage.getItem("role");
+      if (role === "organizer") {
+        navigate("/organizer-home");
+      } else {
+        alert("Please login as an Organizer to access the Dashboard.");
+        navigate("/"); 
+      }
+    } else if (link === "/booking" && eventData) {
+      // Pass the event object into the booking state
+      navigate(link, { state: { event: eventData } });
+    } else {
+      navigate(link);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -100,7 +138,10 @@ const Home = () => {
                   <p className="text-lg md:text-xl text-white/90 mb-10 font-medium max-w-lg">
                     {slide.subtitle}
                   </p>
-                  <button className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black hover:bg-blue-50 transition-all active:scale-95 shadow-lg">
+                  <button 
+                    onClick={() => handleSlideAction(slide)}
+                    className="bg-white text-slate-900 px-10 py-4 rounded-2xl font-black hover:bg-blue-50 transition-all active:scale-95 shadow-lg border-2 border-transparent hover:border-blue-600/20"
+                  >
                     {slide.btnText}
                   </button>
                 </div>
@@ -141,7 +182,7 @@ const Home = () => {
           <div className="grid md:grid-cols-3 gap-10">
             {dynamicEvents.length > 0 ? (
               dynamicEvents.map((event, i) => (
-                <div key={i} className="group cursor-pointer" onClick={() => navigate(`/event/${event._id}`)}>
+                <div key={i} className="group cursor-pointer" onClick={() => navigate(`/booking`, { state: { event } })}>
                   <div className="relative overflow-hidden rounded-[2.5rem] shadow-sm mb-6 border border-slate-100">
                     <img 
                       // Updated to use dynamic image path (Cloudinary)
@@ -150,6 +191,11 @@ const Home = () => {
                       className="h-72 w-full object-cover group-hover:scale-110 transition-transform duration-700" 
                       onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1501386761578-eac5c94b800a"; }}
                     />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <span className="bg-white text-slate-900 px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest shadow-2xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        Book Now
+                      </span>
+                    </div>
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-xs font-black text-blue-600 shadow-lg">
                       {new Date(event.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </div>

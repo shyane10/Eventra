@@ -7,21 +7,28 @@ const { sendOtpEmail } = require("../../middlewear/nodemailer");
 // ===== 1. Register Request (Create organizer with OTP) =====
 exports.organizerRegister = async (req, res) => {
   try {
-    const { organizerName, organizerEmail, venue, password, phoneNumber } = req.body;
+    let { organizerName, organizerEmail, venue, password, phoneNumber } = req.body;
+    
+    if (!organizerName || !organizerEmail || !venue || !password || !phoneNumber) {
+        return res.status(400).json({ message: "All fields are required for organizer registration." });
+    }
+
+    // Normalize email
+    organizerEmail = organizerEmail.trim().toLowerCase();
 
     // Email check Organizer ra User dubai model ma
     const existingOrganizer = await Organizer.findOne({ organizerEmail });
     const existingUser = await User.findOne({ email: organizerEmail });
 
     if (existingOrganizer || existingUser) {
-      return res.status(400).json({ message: "Email already exists in our system" });
+      return res.status(400).json({ message: "Email already exists in our system. Use a different email." });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Naya organizer create garne (isEmailVerified default: false hunchha)
-    await Organizer.create({
+    const organizer = await Organizer.create({
       organizerName,
       organizerEmail,
       venue,
@@ -30,6 +37,8 @@ exports.organizerRegister = async (req, res) => {
       otp: otp,
       isEmailVerified: false // Model ko field sanga match gareko
     });
+
+    console.log(`✅ SUCCESS: Organizer ${organizerEmail} saved to database.`);
 
     // Email pathaune
     await sendOtpEmail(organizerEmail, otp);
@@ -46,8 +55,15 @@ exports.organizerRegister = async (req, res) => {
 // ===== 2. Verify OTP (Update verification status) =====
 exports.verifyOrganizerOtp = async (req, res) => {
   try {
-    const { organizerEmail, otp } = req.body;
+    let { organizerEmail, otp } = req.body;
     
+    if (!organizerEmail || !otp) {
+        return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    // Normalize email
+    organizerEmail = organizerEmail.trim().toLowerCase();
+
     const organizer = await Organizer.findOne({ organizerEmail });
 
     if (!organizer) {
@@ -76,7 +92,14 @@ exports.verifyOrganizerOtp = async (req, res) => {
 // ===== 3. Login (Only for verified organizers) =====
 exports.organizerLogin = async (req, res) => {
   try {
-    const { organizerEmail, password } = req.body;
+    let { organizerEmail, password } = req.body;
+
+    if (!organizerEmail || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    // Normalize email
+    organizerEmail = organizerEmail.trim().toLowerCase();
 
     // Organizer khojne
     const organizer = await Organizer.findOne({ organizerEmail });

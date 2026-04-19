@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -12,22 +13,93 @@ import {
   ChevronRight,
   PackagePlus
 } from "lucide-react";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
 
 const OrganizerDB = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [organizer, setOrganizer] = useState(null);
+  
+  // Dynamic State
+  const [myEvents, setMyEvents] = useState([]);
+  const [attendees, setAttendees] = useState([]);
+  const [revenueHistory, setRevenueHistory] = useState([]); // New state for line graph
+  const [dashboardStats, setDashboardStats] = useState({
+    ticketRevenue: 0,
+    productRevenue: 0,
+    totalRevenue: 0,
+    totalAttendees: 0,
+    productsSold: 0,
+    eventCount: 0
+  });
+  const [loading, setLoading] = useState(false);
 
   // 1. Load organizer data from localStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = localStorage.getItem("user") || localStorage.getItem("Organizer");
     if (storedUser) {
       setOrganizer(JSON.parse(storedUser));
     } else {
-      // Basic Protection: Redirect to login if no user found
       navigate("/");
     }
   }, [navigate]);
+
+  // 1b. Fetch Data based on Tab
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      
+      setLoading(true);
+      try {
+        if (activeTab === "events" || activeTab === "dashboard") {
+          const res = await axios.get("http://localhost:5000/api/events/my-events", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setMyEvents(res.data.events || []);
+        }
+        
+        if (activeTab === "attendees" || activeTab === "dashboard") {
+          const res = await axios.get("http://localhost:5000/api/history/attendees", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setAttendees(res.data.attendees || []);
+        }
+
+        if (activeTab === "dashboard") {
+          const statsRes = await axios.get("http://localhost:5000/api/history/organizer-stats", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setDashboardStats(statsRes.data.stats);
+
+          const res = await axios.get("http://localhost:5000/api/history/revenue-analytics", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          // Format data for stock-style graph (cumulative or time-series)
+          const rawData = res.data.data || [];
+          const formatted = rawData.map(d => ({
+             date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+             revenue: d.amount
+          }));
+          setRevenueHistory(formatted);
+        }
+      } catch (err) {
+        console.error("Failed to fetch organizer data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [activeTab]);
 
   // 2. LOGOUT HANDLER
   const handleLogout = () => {
@@ -38,12 +110,44 @@ const OrganizerDB = () => {
     }
   };
 
-  // Mock Stats Data
+  // DYNAMIC STATS CALCULATION
+  const totalEventsCount = myEvents.length;
+  const totalBookingsCount = attendees.reduce((acc, curr) => acc + (curr.quantity || 1), 0);
+  const totalRevenue = attendees.reduce((acc, curr) => acc + (curr.totalPaid || 0), 0);
+
   const stats = [
-    { label: "Total Events", value: "12", icon: <CalendarDays className="text-blue-500" />, trend: "+2 this month" },
-    { label: "Total Bookings", value: "1,240", icon: <Users className="text-purple-500" />, trend: "+15% growth" },
-    { label: "Revenue", value: "Rs. 85,000", icon: <BarChart3 className="text-green-500" />, trend: "+10% vs last week" },
+    { label: "Total Events", value: dashboardStats.eventCount.toString(), icon: <CalendarDays className="text-blue-500" /> },
+    { label: "Total Bookings", value: dashboardStats.totalAttendees.toString(), icon: <Users className="text-purple-500" /> },
+    { label: "Ticket Revenue", value: `Rs. ${dashboardStats.ticketRevenue.toLocaleString()}`, icon: <BarChart3 className="text-green-500" /> },
+    { label: "Product Revenue", value: `Rs. ${dashboardStats.productRevenue.toLocaleString()}`, icon: <PackagePlus className="text-emerald-500" /> },
   ];
+
+  // PREPARE GRAPH DATA (Revenue by Event)
+  const calculateGraphData = () => {
+    if (!attendees || attendees.length === 0) return [];
+    
+    const eventSales = {};
+    attendees.forEach(booking => {
+      const eventName = booking.event?.title || 'Unknown';
+      if (!eventSales[eventName]) eventSales[eventName] = 0;
+      eventSales[eventName] += (booking.totalPaid || 0);
+    });
+
+    const graphData = Object.keys(eventSales).map(key => ({
+      name: key,
+      revenue: eventSales[key]
+    }));
+
+    // Find max for scaling
+    const maxRev = Math.max(...graphData.map(d => d.revenue), 1);
+    
+    return graphData.map(d => ({
+      ...d,
+      heightPercentage: (d.revenue / maxRev) * 100
+    }));
+  };
+
+  const chartData = calculateGraphData();
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -167,34 +271,114 @@ const OrganizerDB = () => {
         {/* Tab Content Logic */}
         {activeTab === "dashboard" && (
           <>
+            {/* Combined Total Floating Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-emerald-500 p-8 rounded-3xl mb-10 shadow-2xl flex justify-between items-center overflow-hidden relative group">
+               <div className="relative z-10">
+                  <p className="text-blue-100 text-xs font-black uppercase tracking-[0.2em] mb-2">Platform Power Balance</p>
+                  <h3 className="text-4xl font-black text-white">Rs. {dashboardStats.totalRevenue.toLocaleString()}</h3>
+                  <p className="text-blue-100/70 text-sm mt-2 font-medium">Total combined revenue from all your events & merchandise.</p>
+               </div>
+               <div className="p-5 bg-white/10 rounded-2xl relative z-10 backdrop-blur-md">
+                  <BarChart3 className="text-white" size={40} />
+               </div>
+               {/* Pattern Overlay */}
+               <div className="absolute top-0 right-0 w-64 h-full bg-white/5 skew-x-12 transform translate-x-32 group-hover:translate-x-24 transition-transform duration-700"></div>
+            </div>
+
             {/* Stats Grid */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
               {stats.map((stat, idx) => (
                 <div key={idx} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl hover:border-blue-500/30 transition-all duration-300 group">
                   <div className="flex justify-between items-start mb-4">
                     <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 group-hover:border-blue-500/50 transition-colors">
                       {stat.icon}
                     </div>
-                    <span className="text-xs font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
-                      {stat.trend}
-                    </span>
                   </div>
                   <h3 className="text-slate-500 font-semibold mb-1 uppercase text-xs tracking-wider">{stat.label}</h3>
-                  <p className="text-3xl font-bold text-white tracking-tight">{stat.value}</p>
+                  <p className="text-2xl font-bold text-white tracking-tight">{stat.value}</p>
                 </div>
               ))}
             </section>
 
-            {/* Upcoming Events Table */}
-            <section className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+            {/* REVENUE GRAPH VIEW (Stock Market Style) */}
+            <section className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl mb-10 overflow-hidden">
+              <div className="flex justify-between items-center mb-10">
+                <div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Market Performance</h3>
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Real-time revenue growth from Events & Merch</p>
+                </div>
+                <div className="flex items-center gap-2">
+                   <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                   <span className="text-blue-500 text-[10px] font-black uppercase tracking-widest">Live Data</span>
+                </div>
+              </div>
+              
+              <div className="h-80 w-full mt-4">
+                {revenueHistory.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full bg-slate-950/50 rounded-2xl border border-dashed border-slate-800">
+                    <BarChart3 size={48} className="text-slate-600 mb-4" />
+                    <p className="text-slate-400 font-medium">No sales data available to plot yet.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={revenueHistory}>
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#475569" 
+                        fontSize={10} 
+                        fontWeight="bold" 
+                        tickLine={false} 
+                        axisLine={false}
+                        dy={10}
+                      />
+                      <YAxis 
+                        stroke="#475569" 
+                        fontSize={10} 
+                        fontWeight="bold" 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(value) => `Rs.${value}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#0f172a', 
+                          border: '1px solid #1e293b',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          color: '#fff'
+                        }}
+                        itemStyle={{ color: '#60a5fa' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#3b82f6" 
+                        strokeWidth={4}
+                        fillOpacity={1} 
+                        fill="url(#colorRevenue)" 
+                        animationDuration={2000}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* Dynamic Tabs Logic */}
+        {activeTab === "events" && (
+          <section className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
               <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                <h3 className="text-xl font-bold text-white">Recent Events</h3>
-                <button 
-                  onClick={() => setActiveTab("events")}
-                  className="text-sm font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1 transition-colors"
-                >
-                  View All <ChevronRight size={16} />
-                </button>
+                <h3 className="text-xl font-bold text-white">All My Events</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -204,49 +388,83 @@ const OrganizerDB = () => {
                       <th className="px-6 py-5">Date</th>
                       <th className="px-6 py-5">Venue</th>
                       <th className="px-6 py-5">Status</th>
-                      <th className="px-6 py-5 text-right">Bookings</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
-                    <tr className="hover:bg-slate-800/30 transition-colors group">
-                      <td className="px-6 py-5 font-bold text-white group-hover:text-blue-400 transition-colors">Music Festival 2026</td>
-                      <td className="px-6 py-5 text-slate-400 text-sm">March 25, 2026</td>
-                      <td className="px-6 py-5 text-slate-400 text-sm">Kathmandu, Nepal</td>
-                      <td className="px-6 py-5">
-                        <span className="px-3 py-1 text-[10px] font-black uppercase bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">Confirmed</span>
-                      </td>
-                      <td className="px-6 py-5 text-slate-300 font-mono text-right font-bold">450/500</td>
-                    </tr>
-                    <tr className="hover:bg-slate-800/30 transition-colors group">
-                      <td className="px-6 py-5 font-bold text-white group-hover:text-blue-400 transition-colors">Tech Workshop</td>
-                      <td className="px-6 py-5 text-slate-400 text-sm">April 10, 2026</td>
-                      <td className="px-6 py-5 text-slate-400 text-sm">Pokhara Hall</td>
-                      <td className="px-6 py-5">
-                        <span className="px-3 py-1 text-[10px] font-black uppercase bg-yellow-500/10 text-yellow-400 rounded-lg border border-yellow-500/20">In Draft</span>
-                      </td>
-                      <td className="px-6 py-5 text-slate-300 font-mono text-right font-bold">0/100</td>
-                    </tr>
+                    {loading ? (
+                       <tr><td colSpan="4" className="text-center py-6">Loading...</td></tr>
+                    ) : myEvents.length === 0 ? (
+                       <tr><td colSpan="4" className="text-center py-6 text-slate-500">No events created yet.</td></tr>
+                    ) : (
+                      myEvents.map(event => (
+                        <tr key={event._id} className="hover:bg-slate-800/30 transition-colors group">
+                          <td className="px-6 py-5 font-bold text-white">{event.title}</td>
+                          <td className="px-6 py-5 text-slate-400 text-sm">{new Date(event.startDate).toLocaleDateString()}</td>
+                          <td className="px-6 py-5 text-slate-400 text-sm">{event.venueName}</td>
+                          <td className="px-6 py-5">
+                            <span className="px-3 py-1 text-[10px] font-black uppercase bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">{event.status || 'Published'}</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
-            </section>
-          </>
+          </section>
         )}
 
-        {/* Placeholder for other tabs */}
-        {activeTab !== "dashboard" && (
-            <div className="flex flex-col items-center justify-center h-[50vh] text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/20">
-                <div className="p-4 bg-slate-900 rounded-full mb-4">
-                  <PlusCircle size={40} className="text-slate-700" />
-                </div>
-                <p className="text-xl font-bold text-slate-400">Section Under Construction</p>
-                <p className="text-sm italic">The {activeTab} module will be integrated soon.</p>
-                <button 
-                  onClick={() => setActiveTab("dashboard")}
-                  className="mt-6 text-blue-500 hover:underline font-bold"
-                >
-                  Back to Overview
-                </button>
+        {activeTab === "attendees" && (
+          <section className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <h3 className="text-xl font-bold text-white">Registered Attendees</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-950/50 text-slate-500 text-[10px] uppercase tracking-[2px] font-black">
+                      <th className="px-6 py-5">User Name</th>
+                      <th className="px-6 py-5">Email</th>
+                      <th className="px-6 py-5">Event Booked</th>
+                      <th className="px-6 py-5">Quantity</th>
+                      <th className="px-6 py-5">Total Paid</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {loading ? (
+                       <tr><td colSpan="5" className="text-center py-6">Loading...</td></tr>
+                    ) : attendees.length === 0 ? (
+                       <tr><td colSpan="5" className="text-center py-6 text-slate-500">No attendees have booked yet.</td></tr>
+                    ) : (
+                      attendees.map(booking => (
+                        <tr key={booking._id} className="hover:bg-slate-800/30 transition-colors group">
+                          <td className="px-6 py-5 font-bold text-white">{booking.user?.name || 'Unknown User'}</td>
+                          <td className="px-6 py-5 text-slate-400 text-sm">{booking.user?.email || 'N/A'}</td>
+                          <td className="px-6 py-5 text-slate-400 font-medium">{booking.event?.title || 'Unknown Event'}</td>
+                          <td className="px-6 py-5 text-blue-400 font-mono font-bold">{booking.quantity}</td>
+                          <td className="px-6 py-5 text-green-400 font-mono font-bold">Rs. {booking.totalPaid}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+          </section>
+        )}
+
+        {activeTab === "settings" && (
+            <div className="flex flex-col items-center justify-center p-10 bg-slate-900 border border-slate-800 rounded-3xl shadow-xl">
+               <h3 className="text-2xl font-bold text-white mb-6">Organizer Settings</h3>
+               <div className="w-full max-w-md space-y-4">
+                 <div>
+                   <label className="block text-slate-400 text-xs font-bold uppercase mb-2">Organizer Email</label>
+                   <input type="text" disabled value={organizer?.organizerEmail || organizer?.email || ''} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-slate-300" />
+                 </div>
+                 <div>
+                   <label className="block text-slate-400 text-xs font-bold uppercase mb-2">Organizer Name</label>
+                   <input type="text" disabled value={organizer?.organizerName || organizer?.name || ''} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-slate-300" />
+                 </div>
+                 <p className="text-slate-500 text-sm mt-4 italic">Note: Settings update feature is coming soon.</p>
+               </div>
             </div>
         )}
       </main>

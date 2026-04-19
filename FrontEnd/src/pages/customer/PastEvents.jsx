@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { History, MapPin, Loader2, Camera } from "lucide-react";
+import logo from "../../image/image.png";
 
 const PastEvents = () => {
   const [events, setEvents] = useState([]);
@@ -9,7 +10,7 @@ const PastEvents = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/all");
+        const res = await axios.get("http://localhost:5000/api/events/all");
         
         const eventArray = Array.isArray(res.data) 
           ? res.data 
@@ -51,11 +52,24 @@ const PastEvents = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {events.map((event) => (
               <div key={event._id} className="bg-[#1a1a1a] border border-white/5 rounded-2xl overflow-hidden opacity-60 grayscale hover:grayscale-0 transition-all duration-700 group">
-                <div className="h-40 bg-slate-900 flex items-center justify-center relative">
-                   <Camera size={32} className="text-white/5" />
-                   <div className="absolute top-4 right-4 bg-black/60 px-3 py-1 rounded text-[10px] font-bold text-slate-400">
+                <div className="h-40 bg-slate-900 flex items-center justify-center relative overflow-hidden group">
+                   {event.eventImage ? (
+                     <img 
+                       src={event.eventImage.startsWith("http") ? event.eventImage : logo} 
+                       alt={event.title}
+                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                       onError={(e) => { 
+                         e.target.onerror = null;
+                         e.target.src = logo; 
+                       }}
+                     />
+                   ) : (
+                     <Camera size={32} className="text-white/5" />
+                   )}
+                   <div className="absolute top-4 right-4 bg-black/60 px-3 py-1 rounded text-[10px] font-bold text-slate-400 z-10">
                      ENDED
                    </div>
+                   <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] to-transparent opacity-60"></div>
                 </div>
                 
                 <div className="p-6">

@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto"); // Added for Forgot Password
+const crypto = require("crypto");
 const User = require("../../models/userModel");
 const Organizer = require("../../models/organizerModel");
 const { sendOtpEmail } = require("../../middlewear/nodemailer");
@@ -8,16 +8,32 @@ const { sendOtpEmail } = require("../../middlewear/nodemailer");
 // ===== 1. User Register =====
 exports.userRegister = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    let { name, email, password } = req.body;
 
-    const existingUser = await User.findOne({
-      $or: [{ email: email }, { userEmail: email }]
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Full name, email, and password are required." });
+    }
+
+    // Normalize email for searching
+    const searchEmail = email.trim().toLowerCase();
+
+    // Aggressive check for existing accounts
+    const existingUser = await User.findOne({ 
+      email: { $regex: new RegExp(`^${searchEmail}$`, "i") } 
     });
-    const existingOrganizer = await Organizer.findOne({ organizerEmail: email });
+    
+    const existingOrganizer = await Organizer.findOne({ 
+      organizerEmail: { $regex: new RegExp(`^${searchEmail}$`, "i") } 
+    });
 
     if (existingUser || existingOrganizer) {
-      return res.status(400).json({ message: "Email already exists" });
+      return res.status(400).json({ 
+        message: "Account already exists with this email. Please try logging in or use a different email." 
+      });
     }
+
+    // Use normalized email for creation
+    email = searchEmail;
 
     const otp = Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -25,19 +41,22 @@ exports.userRegister = async (req, res) => {
     const user = await User.create({
       name,
       email,
-      userEmail: email,
       password: hashedPassword,
       otp: otp,
       isEmailVerified: false
     });
 
+    console.log(`✅ SUCCESS: User ${email} saved to database.`);
     await sendOtpEmail(email, otp);
     res.status(201).json({ message: "User registered! Verify OTP." });
 
   } catch (error) {
-    console.error("Register Error:", error);
+    console.error("DEBUG: Register Error Object:", error);
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Database Index Error: Duplicate key detected." });
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ 
+        message: `Registration failed: The ${field} is already in use.` 
+      });
     }
     res.status(500).json({ message: "Server Error", details: error.message });
   }
@@ -46,8 +65,11 @@ exports.userRegister = async (req, res) => {
 // ===== 2. Verify OTP =====
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    let { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ message: "Email and OTP are required" });
+
+    // Normalize email
+    email = email.trim().toLowerCase();
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -67,11 +89,14 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
-// ===== 3. User Login =====
+// ===== 3. User Login (UPDATED: Sends role for Admin detection) =====
 exports.userLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: "Please enter email and password" });
+
+    // Normalize email
+    email = email.trim().toLowerCase();
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
@@ -83,8 +108,11 @@ exports.userLogin = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
+    // Identify role from DB (defaults to 'user' if not set)
+    const userRole = user.role || 'user';
+
     const token = jwt.sign(
-      { id: user._id, role: 'user' },
+      { id: user._id, role: userRole },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -92,7 +120,12 @@ exports.userLogin = async (req, res) => {
     res.status(200).json({
       token,
       message: "Login successful",
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email,
+        role: userRole // CRITICAL: Frontend needs this to navigate to Admin Dashboard
+      }
     });
   } catch (error) {
     console.error("Login Error:", error);
@@ -105,14 +138,14 @@ exports.logout = async (req, res) => {
   try {
     res.status(200).json({ 
       success: true, 
-      message: "Logged out successfully. Please clear your local storage." 
+      message: "Logged out successfully." 
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error during logout" });
   }
 };
 
-// ===== 5. Forgot Password (UPDATED) =====
+// ===== 5. Forgot Password =====
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -125,7 +158,6 @@ exports.forgotPassword = async (req, res) => {
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     
     user.resetPasswordToken = resetCode;
-    // 10 minutes from now
     user.resetPasswordExpires = Date.now() + 600000; 
     await user.save();
 
@@ -144,7 +176,7 @@ exports.forgotPassword = async (req, res) => {
       html: `
         <div style="font-family: sans-serif; text-align: center; padding: 20px;">
           <h2>Password Reset Code</h2>
-          <p>Use the code below to reset your password. This code is valid for <strong>10 minutes</strong>.</p>
+          <p>Use the code below to reset your password. Valid for 10 minutes.</p>
           <h1 style="color: #2563eb; font-size: 40px; letter-spacing: 5px;">${resetCode}</h1>
         </div>`
     });
@@ -156,29 +188,25 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+// ===== 6. Reset Password =====
 exports.resetPassword = async (req, res) => {
   try {
     const { code, password } = req.body;
 
-    // 1. Find user by code only
     const user = await User.findOne({ resetPasswordToken: code.toString().trim() });
 
     if (!user) {
       return res.status(400).json({ message: "Invalid code. Please request a new one." });
     }
 
-    // 2. Check Expiry manually using Date objects
     const now = new Date();
     const expiry = new Date(user.resetPasswordExpires);
 
     if (now > expiry) {
-      return res.status(400).json({ message: "This code has expired. Please request a new one." });
+      return res.status(400).json({ message: "This code has expired." });
     }
 
-    // 3. Success - Update password
     user.password = await bcrypt.hash(password, 10);
-    
-    // Clear the fields
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save();
@@ -187,5 +215,44 @@ exports.resetPassword = async (req, res) => {
   } catch (error) {
     console.error("Reset Error:", error);
     res.status(500).json({ message: "Server Error" });
+  }
+};
+
+// ===== 7. Contact Us Form =====
+exports.sendContactEmail = async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body;
+    
+    if (!name || !email || !message) {
+      return res.status(400).json({ message: "Name, email, and message are required." });
+    }
+
+    const nodemailer = require("nodemailer");
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      to: "eventra121@gmail.com",
+      replyTo: email,
+      subject: `New Contact Inquiry: ${subject}`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #2563eb;">New Contact Message</h2>
+          <p><strong>From:</strong> ${name} (${email})</p>
+          <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
+            <p>${message}</p>
+          </div>
+        </div>`
+    });
+
+    res.status(200).json({ message: "Message sent successfully!" });
+  } catch (error) {
+    console.error("Contact Email Error:", error);
+    res.status(500).json({ message: "Failed to send message." });
   }
 };

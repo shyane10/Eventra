@@ -1,23 +1,95 @@
 import React, { useState } from "react";
-import { CreditCard, Wallet, Users, Ticket, CheckCircle2, ShieldCheck } from "lucide-react";
+import { CreditCard, Wallet, Users, Ticket, CheckCircle2, ShieldCheck, ArrowLeft, Calendar, MapPin } from "lucide-react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 
 const Book = () => {
   const [ticketCount, setTicketCount] = useState(1);
-  const TICKET_PRICE = 1500; // NPR
-  const SERVICE_FEE = 50;
+  const [formData, setFormData] = useState({ name: "", phone: "" });
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const event = location.state?.event;
+  const TICKET_PRICE = event?.ticketPrice ? Number(event.ticketPrice) : 0;
+  const SERVICE_FEE = event ? 50 : 0; // only charge fee if there is an event
+
+  const handlePayment = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("Please log in to book tickets.");
+        navigate("/");
+        return;
+      }
+
+      const totalAmount = (TICKET_PRICE * ticketCount) + SERVICE_FEE;
+
+      const response = await axios.post("http://localhost:5000/api/payment/initialize", {
+        amount: totalAmount,
+        eventId: event._id,
+        quantity: ticketCount,
+        purchase_order_name: `Ticket for ${event.title}`,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success && response.data.payment_url) {
+        // Redirect to Khalti
+        window.location.href = response.data.payment_url;
+      } else {
+        alert("Failed to initialize payment with Khalti.");
+      }
+    } catch (err) {
+      console.error("Payment Error:", err.response?.data || err.message);
+      alert("Failed to process payment. Please try again later.");
+    }
+  };
+
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-4">
+        <Ticket size={64} className="text-slate-600 mb-6" />
+        <h1 className="text-3xl font-black mb-2">No Event Selected</h1>
+        <p className="text-slate-400 mb-8 text-center max-w-sm">Please select an event from the events page to proceed with booking tickets.</p>
+        <Link to="/events/upcoming" className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-xl transition">
+          Browse Events
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans p-4 md:p-10 selection:bg-purple-500">
       <div className="max-w-6xl mx-auto">
         
         {/* Header Section */}
-        <div className="mb-10 text-center md:text-left">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-3 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            Secure Your Tickets
-          </h1>
-          <p className="text-slate-400 max-w-2xl">
-            You're just one step away from the biggest concert of 2026. Review your details and pay securely via Khalti.
-          </p>
+        <div className="mb-10">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition font-bold mb-6"
+          >
+            <ArrowLeft size={18} /> Back to Event
+          </button>
+          
+          <div className="flex flex-col md:flex-row gap-6 items-center bg-slate-900/50 p-6 rounded-[2rem] border border-slate-800 backdrop-blur-sm">
+            <img 
+              src={event.eventImage || "https://via.placeholder.com/400x400?text=Event"} 
+              alt={event.title}
+              className="w-full md:w-32 md:h-32 object-cover rounded-2xl"
+            />
+            <div className="text-center md:text-left">
+              <span className="bg-blue-500/20 text-blue-400 text-xs font-bold uppercase px-3 py-1 rounded-full mb-3 inline-block">
+                {event.category || "Event"}
+              </span>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2 text-white">
+                {event.title}
+              </h1>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-slate-400 text-sm font-medium">
+                <span className="flex items-center gap-1.5"><Calendar size={16} className="text-blue-500"/> {new Date(event.startDate).toLocaleDateString()}</span>
+                <span className="flex items-center gap-1.5"><MapPin size={16} className="text-red-500"/> {event.venueName}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -35,7 +107,7 @@ const Book = () => {
               <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
                 <div>
                   <p className="font-bold">Standard Entrance</p>
-                  <p className="text-sm text-slate-500 font-mono">NPR {TICKET_PRICE} / person</p>
+                  <p className="text-sm text-slate-500 font-mono">{TICKET_PRICE > 0 ? `NPR ${TICKET_PRICE} / person` : "FREE"} </p>
                 </div>
                 <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-xl">
                   <button 
@@ -121,7 +193,10 @@ const Book = () => {
                 </span>
               </div>
 
-              <button className="w-full bg-[#5C2D91] hover:bg-[#4a2475] text-white font-black py-5 rounded-2xl transition-all transform active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(92,45,145,0.4)]">
+              <button 
+                onClick={handlePayment}
+                className="w-full bg-[#5C2D91] hover:bg-[#4a2475] text-white font-black py-5 rounded-2xl transition-all transform active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(92,45,145,0.4)]"
+              >
                 PAY WITH KHALTI
               </button>
 

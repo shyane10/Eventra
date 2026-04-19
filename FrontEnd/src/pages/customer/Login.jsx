@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom"; // Added Link import
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import logo from "../../image/image.png"; 
 
@@ -11,7 +11,7 @@ const Login = () => {
   const [form, setForm] = useState({
     email: "",
     password: "",
-    role: "user", // Default selection
+    role: "user", 
   });
 
   const handleChange = (e) => {
@@ -25,31 +25,47 @@ const Login = () => {
     try {
       // 1. Determine Endpoints based on Role
       const endpoint = form.role === "organizer" 
-        ? "http://localhost:5000/organizerLogin" 
-        : "http://localhost:5000/userLogin";
+        ? "http://localhost:5000/api/organizer/organizerLogin" 
+        : "http://localhost:5000/api/auth/userLogin";
 
-      // 2. Prepare Payload (Organizers often use 'organizerEmail' in backend)
+      // 2. Prepare Payload
       const payload = form.role === "organizer" 
         ? { organizerEmail: form.email, password: form.password } 
         : { email: form.email, password: form.password };
 
       const response = await axios.post(endpoint, payload);
 
-      // 3. Store Data in LocalStorage
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("role", form.role);
-      
-      // Save specific user/organizer details
-      const profileData = form.role === "organizer" ? response.data.organizer : response.data.user;
-      localStorage.setItem("user", JSON.stringify(profileData));
+      // --- 3. STORAGE LOGIC ---
+      if (response.data.token) {
+        localStorage.setItem("token", response.data.token);
+        
+        // Extract the user/organizer object from response
+        const profileData = form.role === "organizer" ? response.data.organizer : response.data.user;
 
-      alert("Login successful!");
+        if (profileData) {
+          // Identify the actual role from DB (important for Admin detection)
+          const actualRole = profileData.role || form.role;
+          
+          localStorage.setItem("role", actualRole);
+          localStorage.setItem("user", JSON.stringify(profileData));
+          
+          if (form.role === "organizer") {
+            localStorage.setItem("Organizer", JSON.stringify(profileData));
+          }
 
-      // 4. Navigate to correct Dashboard
-      if (form.role === "organizer") {
-        navigate("/organizer-home");
+          alert("Login successful!");
+
+          // --- 4. NAVIGATION LOGIC (Role Based) ---
+          if (actualRole === "admin") {
+            navigate("/admin-dashboard"); // Redirect to the Command Center
+          } else if (actualRole === "organizer") {
+            navigate("/organizer-home");
+          } else {
+            navigate("/home");
+          }
+        }
       } else {
-        navigate("/home");
+        alert("Token not received. Check server console.");
       }
       
     } catch (error) {
@@ -94,7 +110,6 @@ const Login = () => {
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Email Address</label>
@@ -110,13 +125,9 @@ const Login = () => {
           </div>
 
           <div>
-            {/* Added Flex container to put label and link on the same line */}
             <div className="flex justify-between items-center mb-1.5">
               <label className="block text-sm font-medium text-slate-400 uppercase tracking-wider">Password</label>
-              <Link 
-                to="/forgot-password" 
-                className="text-xs font-bold text-blue-500 hover:text-blue-400 transition"
-              >
+              <Link to="/forgot-password" size={12} className="text-xs font-bold text-blue-500 hover:text-blue-400 transition">
                 Forgot Password?
               </Link>
             </div>
@@ -156,10 +167,7 @@ const Login = () => {
 
         <p className="text-center text-slate-500 mt-8 text-sm">
           Don't have an account?{" "}
-          <button 
-            onClick={() => navigate("/register")} 
-            className="text-blue-500 font-bold hover:underline"
-          >
+          <button onClick={() => navigate("/register")} className="text-blue-500 font-bold hover:underline">
             Register Now
           </button>
         </p>

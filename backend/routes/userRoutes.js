@@ -5,18 +5,22 @@ const {
     userLogin, 
     logout, 
     forgotPassword, 
-    resetPassword 
+    resetPassword,
+    sendContactEmail
 } = require("../controller/auth/authController");
 const router = express.Router();
 
 // ====== User Auth Routes ======
-router.route("/userRegister").post(userRegister);
-router.route("/verifyOtp").post(verifyOtp);
-router.route("/userLogin").post(userLogin);
-router.route("/logout").post(logout);
+router.post("/userRegister", userRegister);
+router.post("/verifyOtp", verifyOtp);
+router.post("/userLogin", userLogin);
+router.post("/logout", logout);
 
 // Forgot Password Routes
-router.route("/forgotPassword").post(forgotPassword);
-router.route("/resetPassword").post(resetPassword);
+router.post("/forgotPassword", forgotPassword);
+router.post("/resetPassword", resetPassword);
+
+// Contact Route
+router.post("/contact", sendContactEmail);
 
 module.exports = router;

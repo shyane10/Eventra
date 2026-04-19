@@ -31,14 +31,14 @@ const VerifyOtp = () => {
 
       if (role === "organizer") {
         // Organizer verification
-        endpoint = "http://localhost:5000/verify-otp";
+        endpoint = "http://localhost:5000/api/organizer/verify-otp";
         payload = {
           organizerEmail: email, // Organizer le 'organizerEmail' field khojcha
           otp: parseInt(otp)
         };
       } else {
         // User verification
-        endpoint = "http://localhost:5000/verifyOtp";
+        endpoint = "http://localhost:5000/api/auth/verifyOtp";
         payload = {
           email: email, // User le 'email' field matra khojcha
           otp: parseInt(otp)

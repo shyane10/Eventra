@@ -3,15 +3,16 @@ const Event = require("../../models/eventModel");
 // 1. CREATE EVENT
 exports.createEvent = async (req, res) => {
   try {
-    // 1. Get the organizer ID from the auth middleware (verifyToken)
     const organizerId = req.user.id; 
 
-    // 2. Destructure fields for specific validation if needed
+    // Destructure everything from body
     const { 
-      title, startDate, endDate, totalCapacity, isFree, ticketPrice 
+      title, description, category, startDate, endDate, 
+      locationType, venueName, address, totalCapacity, 
+      ticketPrice, isFree 
     } = req.body;
 
-    // 3. Basic Validation (matches your 'required' schema fields)
+    // 1. Validation
     if (!title || !startDate || !endDate || !totalCapacity) {
       return res.status(400).json({ 
         success: false,
@@ -19,27 +20,28 @@ exports.createEvent = async (req, res) => {
       });
     }
 
-    // 4. Handle Cloudinary Image
-    // req.file.path is provided by the 'multer-storage-cloudinary' middleware
-    let eventImage = "default-event.jpg"; // Your schema's default
-    if (req.file) {
-      eventImage = req.file.path; 
-    }
+    // 2. Handle Image path
+    const eventImage = req.file ? req.file.path : "default-event.jpg";
 
-    // 5. Create the Event object
-    // We spread req.body and manually override specific fields to ensure type safety
+    // 3. Create the Event (Manually mapping to ensure correct types)
     const newEvent = await Event.create({
-      ...req.body,
+      title,
+      description,
+      category,
+      startDate,
+      endDate,
+      locationType,
+      venueName,
+      address,
+      eventImage,
       organizer: organizerId,
-      eventImage: eventImage,
-      // Convert strings from FormData back to Numbers/Booleans
-      totalCapacity: Number(totalCapacity),
-      ticketPrice: isFree === 'true' ? 0 : Number(ticketPrice || 0),
-      isFree: isFree === 'true', // FormData sends 'true' as a string
-      status: "Published" // Ensures visibility based on our previous fix
+      status: "Published",
+      // CRITICAL: Convert strings to actual Numbers and Booleans
+      totalCapacity: parseInt(totalCapacity, 10),
+      isFree: isFree === 'true' || isFree === true, 
+      ticketPrice: (isFree === 'true' || isFree === true) ? 0 : parseFloat(ticketPrice || 0)
     });
 
-    // 6. Success Response
     res.status(201).json({
       success: true,
       message: "Event created successfully!",
@@ -48,8 +50,7 @@ exports.createEvent = async (req, res) => {
 
   } catch (error) {
     console.error("Create Event Error:", error);
-
-    // Handle Mongoose Validation Errors specifically
+    
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({ success: false, message: messages });
@@ -57,12 +58,11 @@ exports.createEvent = async (req, res) => {
 
     res.status(500).json({ 
       success: false, 
-      message: "Failed to create event", 
+      message: "Internal Server Error", 
       error: error.message 
     });
   }
 };
-
 // 2. GET ALL EVENTS (With Filters)
 exports.getAllEvents = async (req, res) => {
   try {

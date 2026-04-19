@@ -9,17 +9,31 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
+    lowercase: true,
+    trim: true,
   },
   password: {
     type: String,
     required: true,
   },
+  // --- ADDED ROLE FIELD ---
+  role: {
+    type: String,
+    enum: ["user", "admin", "organizer"], // Restricts values to these three
+    default: "user",
+  },
+  // ------------------------
   otp: {
     type: Number
   },
   isEmailVerified: {
     type: Boolean,
     default: false
+  },
+  status: {
+    type: String,
+    enum: ["active", "blocked"],
+    default: "active"
   },
   // --- ADDED FOR FORGOT PASSWORD ---
   resetPasswordToken: {

@@ -41,8 +41,21 @@ const isOrganizer = (req, res, next) => {
     }
 };
 
-// 3. Export as an object (CRITICAL for your Routes to work)
+// 3. Authorization Middleware: Checks if the user is an Admin
+const isAdmin = (req, res, next) => {
+    if (req.user && req.user.role === "admin") {
+        next();
+    } else {
+        return res.status(403).json({ 
+            success: false, 
+            message: "Forbidden. Only admins can perform this action." 
+        });
+    }
+};
+
+// 4. Export as an object (CRITICAL for your Routes to work)
 module.exports = { 
     verifyToken, 
-    isOrganizer 
+    isOrganizer,
+    isAdmin
 };

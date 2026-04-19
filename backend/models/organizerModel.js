@@ -9,7 +9,9 @@ const organizerSchema = new Schema({
   organizerEmail: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true,
   },
   venue: {
     type: String,
@@ -29,6 +31,11 @@ const organizerSchema = new Schema({
   isEmailVerified: {
     type: Boolean,
     default: false
+  },
+  status: {
+    type: String,
+    enum: ["active", "blocked"],
+    default: "active"
   }
 });
 

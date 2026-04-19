@@ -232,7 +232,7 @@ const CreateEvent = () => {
     venueName: "",
     address: "",
     totalCapacity: "",
-    ticketPrice: 0,
+    ticketPrice: "", // Fixed default 0
     isFree: false,
   });
 
@@ -287,7 +287,7 @@ const CreateEvent = () => {
 
     try {
       await axios.post(
-        "http://localhost:5000/createEvent", 
+        "http://localhost:5000/api/events/createEvent", 
         data,
         {
           headers: {
@@ -300,8 +300,9 @@ const CreateEvent = () => {
       alert("Event Published Successfully!");
       navigate("/organizer-home");
     } catch (error) {
-      console.error("Upload Error:", error);
-      alert(error.response?.data?.message || "Failed to create event. Check if description is missing.");
+      const backendMsg = error.response?.data?.message;
+      const formattedMsg = Array.isArray(backendMsg) ? backendMsg.join(", ") : backendMsg;
+      alert(formattedMsg || "Connection Error: Failed to reach the server.");
     } finally {
       setLoading(false);
     }
@@ -422,8 +423,9 @@ const CreateEvent = () => {
                 <input 
                   type="number" 
                   name="ticketPrice" 
+                  placeholder="e.g. 500"
                   disabled={formData.isFree} 
-                  value={formData.isFree ? 0 : formData.ticketPrice} 
+                  value={formData.isFree ? "" : formData.ticketPrice} 
                   className={`w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 ${formData.isFree ? 'opacity-30' : ''}`} 
                   onChange={handleChange} 
                 />
