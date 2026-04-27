@@ -5,6 +5,7 @@ const SystemConfig = require("../models/systemConfigModel");
 const Revenue = require("../models/revenueModel");
 const Booking = require("../models/bookingModel");
 const Order = require("../models/orderModel");
+const Product = require("../models/product");
 
 // Helper to sync past data without blocking the main request too much
 const syncLegacyData = async (commissionRate) => {
@@ -57,7 +58,7 @@ exports.getAdminStats = async (req, res) => {
     const [totalUsers, totalOrganizers, activeEvents] = await Promise.all([
       User.countDocuments(),
       Organizer.countDocuments(),
-      Event.countDocuments({ status: "Published" })
+      Event.countDocuments({ status: "Approved" })
     ]);
 
     // 2. Financial Aggregate
@@ -166,6 +167,41 @@ exports.deleteEvent = async (req, res) => {
     res.status(500).json({ message: "Error deleting event", error: error.message });
   }
 };
+
+exports.updateEventStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const event = await Event.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    res.status(200).json({ success: true, message: `Event status updated to ${status}`, event });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating event status", error: error.message });
+  }
+};
+
+// --- PRODUCT MANAGEMENT ---
+exports.getAllProducts = async (req, res) => {
+  try {
+    const products = await Product.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, products });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching products", error: error.message });
+  }
+};
+
+exports.updateProductStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const product = await Product.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.status(200).json({ success: true, message: `Product status updated to ${status}`, product });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating product status", error: error.message });
+  }
+};
+
+
+
 
 // --- USER MANAGEMENT ---
 exports.getAllUsers = async (req, res) => {

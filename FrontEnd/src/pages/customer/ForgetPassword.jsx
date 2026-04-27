@@ -16,7 +16,7 @@ const ForgotPassword = () => {
 
     try {
       // Endpoint matches your backend: /forgotPassword
-      const res = await axios.post("http://localhost:5000/forgotPassword", { email });
+      const res = await axios.post("http://localhost:5000/api/auth/forgotPassword", { email });
       
       setStatus({ type: "success", message: "Reset code sent! Redirecting..." });
       

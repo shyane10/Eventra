@@ -67,7 +67,7 @@ exports.addProduct = async (req, res) => {
 // 2. GET ALL PRODUCTS (Global Shop)
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const products = await Product.find({ status: "Approved" }).sort({ createdAt: -1 });
     res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

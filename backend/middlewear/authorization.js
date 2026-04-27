@@ -31,7 +31,7 @@ const verifyToken = (req, res, next) => {
 // 2. Authorization Middleware: Checks if the user is an Organizer
 const isOrganizer = (req, res, next) => {
     // req.user is available because verifyToken runs first
-    if (req.user && req.user.role === "organizer") {
+    if (req.user && (req.user.role === "organizer" || req.user.role === "admin")) {
         next();
     } else {
         return res.status(403).json({ 

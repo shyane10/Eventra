@@ -206,16 +206,19 @@
 
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { 
   Calendar, MapPin, Ticket, Type, Image as ImageIcon, 
-  Loader2, PlusCircle, X, AlignLeft 
+  Loader2, PlusCircle, X, AlignLeft, Edit3
 } from "lucide-react";
 
 const CreateEvent = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const eventToEdit = location.state?.event;
+
   const [loading, setLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imagePreview, setImagePreview] = useState(eventToEdit?.eventImage || null);
   const [selectedFile, setSelectedFile] = useState(null);
 
   // Constants to fix the "202300" date overflow and past date issues
@@ -223,17 +226,17 @@ const CreateEvent = () => {
   const maxDate = "2099-12-31T23:59";
 
   const [formData, setFormData] = useState({
-    title: "",
-    description: "", 
-    category: "Music",
-    startDate: "",
-    endDate: "",
-    locationType: "Venue",
-    venueName: "",
-    address: "",
-    totalCapacity: "",
-    ticketPrice: "", // Fixed default 0
-    isFree: false,
+    title: eventToEdit?.title || "",
+    description: eventToEdit?.description || "", 
+    category: eventToEdit?.category || "Music",
+    startDate: eventToEdit ? new Date(eventToEdit.startDate).toISOString().slice(0, 16) : "",
+    endDate: eventToEdit ? new Date(eventToEdit.endDate).toISOString().slice(0, 16) : "",
+    locationType: eventToEdit?.locationType || "Venue",
+    venueName: eventToEdit?.venueName || "",
+    address: eventToEdit?.address || "",
+    totalCapacity: eventToEdit?.totalCapacity || "",
+    ticketPrice: eventToEdit?.ticketPrice || "", // Fixed default 0
+    isFree: eventToEdit?.isFree || false,
   });
 
   const handleChange = (e) => {
@@ -286,18 +289,31 @@ const CreateEvent = () => {
     }
 
     try {
-      await axios.post(
-        "http://localhost:5000/api/events/createEvent", 
-        data,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      alert("Event Published Successfully!");
+      if (eventToEdit) {
+        await axios.put(
+          `http://localhost:5000/api/events/updateEvent/${eventToEdit._id}`, 
+          data,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        alert("Event Updated Successfully!");
+      } else {
+        await axios.post(
+          "http://localhost:5000/api/events/createEvent", 
+          data,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        alert("Event Published Successfully!");
+      }
       navigate("/organizer-home");
     } catch (error) {
       const backendMsg = error.response?.data?.message;
@@ -314,7 +330,8 @@ const CreateEvent = () => {
         
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white">
           <h2 className="text-3xl font-bold flex items-center gap-3">
-            <PlusCircle size={32} /> Launch Your Event
+            {eventToEdit ? <Edit3 size={32} /> : <PlusCircle size={32} /> }
+            {eventToEdit ? "Edit Your Event" : "Launch Your Event"}
           </h2>
           <p className="text-blue-100 mt-2">Make sure to fill all fields, especially the description!</p>
         </div>
@@ -439,8 +456,8 @@ const CreateEvent = () => {
 
           <div className="pt-6">
             <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3">
-              {loading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />}
-              {loading ? "Publishing..." : "Publish Event Now"}
+              {loading ? <Loader2 className="animate-spin" /> : (eventToEdit ? <Edit3 size={22} /> : <PlusCircle size={22} />)}
+              {loading ? (eventToEdit ? "Updating..." : "Publishing...") : (eventToEdit ? "Update Event" : "Publish Event Now")}
             </button>
           </div>
 

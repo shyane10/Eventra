@@ -35,7 +35,7 @@ exports.createEvent = async (req, res) => {
       address,
       eventImage,
       organizer: organizerId,
-      status: "Published",
+      status: "Pending",
       // CRITICAL: Convert strings to actual Numbers and Booleans
       totalCapacity: parseInt(totalCapacity, 10),
       isFree: isFree === 'true' || isFree === true, 
@@ -67,7 +67,7 @@ exports.createEvent = async (req, res) => {
 exports.getAllEvents = async (req, res) => {
   try {
     // Remove the { status: "Published" } filter
-    const events = await Event.find({}) 
+    const events = await Event.find({ status: "Approved" }) 
       .populate("organizer", "organizerName organizerEmail")
       .sort({ startDate: 1 });
 

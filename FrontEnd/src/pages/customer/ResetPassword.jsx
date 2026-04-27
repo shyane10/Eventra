@@ -28,7 +28,7 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       // Updated to send { code, password } to /resetPassword (no token in URL)
-      await axios.post(`http://localhost:5000/resetPassword`, { 
+      await axios.post(`http://localhost:5000/api/auth/resetPassword`, { 
         code, 
         password 
       });

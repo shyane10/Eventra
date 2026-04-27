@@ -11,7 +11,11 @@ import {
   BarChart3,
   Bell,
   ChevronRight,
-  PackagePlus
+  PackagePlus,
+  ShieldCheck,
+  CheckCircle2,
+  Edit3,
+  Trash2
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -35,10 +39,12 @@ const OrganizerDB = () => {
   const [dashboardStats, setDashboardStats] = useState({
     ticketRevenue: 0,
     productRevenue: 0,
-    totalRevenue: 0,
+    eventCount: 0,
+    totalOrganizerShare: 0,
+    availableBalance: 0,
+    receivedRevenue: 0,
     totalAttendees: 0,
-    productsSold: 0,
-    eventCount: 0
+    totalRevenue: 0
   });
   const [loading, setLoading] = useState(false);
 
@@ -116,11 +122,50 @@ const OrganizerDB = () => {
   const totalRevenue = attendees.reduce((acc, curr) => acc + (curr.totalPaid || 0), 0);
 
   const stats = [
-    { label: "Total Events", value: dashboardStats.eventCount.toString(), icon: <CalendarDays className="text-blue-500" /> },
-    { label: "Total Bookings", value: dashboardStats.totalAttendees.toString(), icon: <Users className="text-purple-500" /> },
-    { label: "Ticket Revenue", value: `Rs. ${dashboardStats.ticketRevenue.toLocaleString()}`, icon: <BarChart3 className="text-green-500" /> },
-    { label: "Product Revenue", value: `Rs. ${dashboardStats.productRevenue.toLocaleString()}`, icon: <PackagePlus className="text-emerald-500" /> },
+    { label: "Total Events", value: (dashboardStats.eventCount || 0).toString(), icon: <CalendarDays className="text-blue-500" /> },
+    { label: "Total Bookings", value: (dashboardStats.totalAttendees || 0).toString(), icon: <Users className="text-purple-500" /> },
+    { label: "Ticket Revenue", value: `Rs. ${(dashboardStats.ticketRevenue || 0).toLocaleString()}`, icon: <BarChart3 className="text-green-500" /> },
+    { label: "Product Revenue", value: `Rs. ${(dashboardStats.productRevenue || 0).toLocaleString()}`, icon: <PackagePlus className="text-emerald-500" /> },
+    { label: "Your 30% Share", value: `Rs. ${(dashboardStats.totalOrganizerShare || 0).toLocaleString()}`, icon: <ShieldCheck className="text-blue-400" /> },
+    { label: "Available to Request", value: `Rs. ${(dashboardStats.availableBalance || 0).toLocaleString()}`, icon: <PlusCircle className="text-orange-500" /> },
+    { label: "Received from Admin", value: `Rs. ${(dashboardStats.receivedRevenue || 0).toLocaleString()}`, icon: <CheckCircle2 className="text-emerald-400" /> },
   ];
+
+  const handleRequestPayout = async () => {
+    if (dashboardStats.availableBalance <= 0) {
+      alert("No available balance to request.");
+      return;
+    }
+    
+    if (!window.confirm(`Request a payout of Rs. ${dashboardStats.availableBalance}?`)) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post("http://localhost:5000/api/history/request-payout", 
+        { amount: dashboardStats.availableBalance },
+        { headers: { Authorization: `Bearer ${token}` }}
+      );
+      alert("Payout request submitted to Admin!");
+      window.location.reload(); 
+    } catch (err) {
+      alert("Failed to submit request.");
+    }
+  };
+
+  const handleDeleteEvent = async (id) => {
+    if (window.confirm("Permanently delete this event?")) {
+      try {
+        const token = localStorage.getItem("token");
+        await axios.delete(`http://localhost:5000/api/events/deleteEvent/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMyEvents(myEvents.filter(e => e._id !== id));
+      } catch (err) {
+        alert("Action failed.");
+      }
+    }
+  };
+
 
   // PREPARE GRAPH DATA (Revenue by Event)
   const calculateGraphData = () => {
@@ -190,7 +235,7 @@ const OrganizerDB = () => {
             onClick={() => navigate("/create-product")}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 text-slate-400 hover:text-white"
           >
-            <PackagePlus size={20} /> Manage Merch
+            <PackagePlus size={20} /> My Products
           </button>
 
           <button 
@@ -248,13 +293,21 @@ const OrganizerDB = () => {
               <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 border-2 border-[#161e2f] rounded-full"></span>
             </button>
             
+            {/* ACTION: REQUEST PAYOUT BUTTON */}
+            <button 
+              onClick={handleRequestPayout}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-orange-500/20 transition-all active:scale-95"
+            >
+              <ShieldCheck size={20} /> Request Payout
+            </button>
+
             {/* ACTION: CREATE PRODUCT BUTTON */}
             <button 
               onClick={() => navigate("/create-product")}
               className="flex items-center gap-2 px-6 py-3.5 bg-[#1e293b] hover:bg-[#2d3a4f] text-white rounded-2xl font-bold transition-all border border-white/5 shadow-xl active:scale-95 cursor-pointer"
             >
               <PackagePlus size={18} className="text-blue-400" />
-              <span>Create Product</span>
+              <span>Add Product</span>
             </button>
 
             {/* ACTION: CREATE EVENT BUTTON */}
@@ -263,7 +316,7 @@ const OrganizerDB = () => {
               className="flex items-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] active:scale-95 cursor-pointer"
             >
               <PlusCircle size={18} />
-              <span>Create Event</span>
+              <span>Add Event</span>
             </button>
           </div>
         </header>
@@ -275,7 +328,7 @@ const OrganizerDB = () => {
             <div className="bg-gradient-to-r from-blue-600 to-emerald-500 p-8 rounded-3xl mb-10 shadow-2xl flex justify-between items-center overflow-hidden relative group">
                <div className="relative z-10">
                   <p className="text-blue-100 text-xs font-black uppercase tracking-[0.2em] mb-2">Platform Power Balance</p>
-                  <h3 className="text-4xl font-black text-white">Rs. {dashboardStats.totalRevenue.toLocaleString()}</h3>
+                  <h3 className="text-4xl font-black text-white">Rs. {(dashboardStats.totalRevenue || 0).toLocaleString()}</h3>
                   <p className="text-blue-100/70 text-sm mt-2 font-medium">Total combined revenue from all your events & merchandise.</p>
                </div>
                <div className="p-5 bg-white/10 rounded-2xl relative z-10 backdrop-blur-md">
@@ -388,6 +441,7 @@ const OrganizerDB = () => {
                       <th className="px-6 py-5">Date</th>
                       <th className="px-6 py-5">Venue</th>
                       <th className="px-6 py-5">Status</th>
+                      <th className="px-6 py-5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
@@ -402,7 +456,25 @@ const OrganizerDB = () => {
                           <td className="px-6 py-5 text-slate-400 text-sm">{new Date(event.startDate).toLocaleDateString()}</td>
                           <td className="px-6 py-5 text-slate-400 text-sm">{event.venueName}</td>
                           <td className="px-6 py-5">
-                            <span className="px-3 py-1 text-[10px] font-black uppercase bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">{event.status || 'Published'}</span>
+                            <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg border ${event.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : event.status === 'Rejected' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-orange-500/10 text-orange-500 border-orange-500/20'}`}>
+                              {event.status || 'Pending'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 text-right">
+                             <div className="flex items-center justify-end gap-2">
+                               <button 
+                                 onClick={() => navigate("/create-event", { state: { event } })}
+                                 className="p-2 bg-white/5 hover:bg-blue-600 text-slate-300 rounded-lg transition-colors"
+                               >
+                                 <Edit3 size={16} />
+                               </button>
+                               <button 
+                                 onClick={() => handleDeleteEvent(event._id)}
+                                 className="p-2 bg-white/5 hover:bg-red-600 text-slate-300 rounded-lg transition-colors"
+                               >
+                                 <Trash2 size={16} />
+                               </button>
+                             </div>
                           </td>
                         </tr>
                       ))

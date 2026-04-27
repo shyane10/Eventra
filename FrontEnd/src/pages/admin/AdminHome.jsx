@@ -5,7 +5,7 @@ import {
   Users, Calendar, IndianRupee, Trash2, 
   Search, Filter, Activity, MapPin, LogOut,
   Briefcase, FileText, Settings, ShieldCheck, 
-  ChevronRight, Download, Save, TrendingUp
+  ChevronRight, Download, Save, TrendingUp, CheckCircle, XCircle
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -15,8 +15,10 @@ import {
 const AdminHome = () => {
   const [activeTab, setActiveTab] = useState("events");
   const [events, setEvents] = useState([]);
+  const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
   const [organizers, setOrganizers] = useState([]);
+  const [payouts, setPayouts] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [dynamicStats, setDynamicStats] = useState({
     totalRevenue: "रू 0",
@@ -31,6 +33,7 @@ const AdminHome = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [newCommission, setNewCommission] = useState("");
   const [isUpdatingCommission, setIsUpdatingCommission] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("All");
   
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -39,30 +42,46 @@ const AdminHome = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [statsRes, eventsRes, usersRes, organizersRes, chartRes] = await Promise.all([
+      const [statsRes, eventsRes, usersRes, organizersRes, productsRes, chartRes, payoutsRes] = await Promise.all([
         axios.get("http://localhost:5000/api/admin/stats", { 
           headers: { Authorization: `Bearer ${token}` } 
         }),
-        axios.get("http://localhost:5000/api/events/all"),
+        axios.get("http://localhost:5000/api/admin/events", { 
+          headers: { Authorization: `Bearer ${token}` } 
+        }),
         axios.get("http://localhost:5000/api/admin/users", {
             headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get("http://localhost:5000/api/admin/organizers", {
             headers: { Authorization: `Bearer ${token}` }
         }),
+        axios.get("http://localhost:5000/api/admin/products", {
+            headers: { Authorization: `Bearer ${token}` }
+        }),
         axios.get("http://localhost:5000/api/admin/chart-data", {
+            headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get("http://localhost:5000/api/admin/payouts", {
             headers: { Authorization: `Bearer ${token}` }
         })
       ]);
 
+
       setDynamicStats(statsRes.data.stats);
       setNewCommission(statsRes.data.stats.commissionRate);
       setEvents(eventsRes.data.events || []);
+      setProducts(productsRes.data.products || []);
       setUsers(usersRes.data.users || []);
       setOrganizers(organizersRes.data.organizers || []);
       setChartData(chartRes.data.chartData || []);
+      setPayouts(payoutsRes.data.requests || []);
     } catch (err) {
       console.error("Dashboard Load Error:", err);
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          alert("You are not authorized as an Admin. Please login with an admin account.");
+          localStorage.clear();
+          navigate("/");
+      }
     } finally {
       setLoading(false);
     }
@@ -86,7 +105,7 @@ const AdminHome = () => {
     navigate("/");
   };
 
-  const handleDelete = async (id) => {
+  const handleDeleteEvent = async (id) => {
     if (window.confirm("Permanently remove this event?")) {
       try {
         await axios.delete(`http://localhost:5000/api/admin/events/${id}`, {
@@ -99,7 +118,46 @@ const AdminHome = () => {
     }
   };
 
+  const handleApproveEvent = async (id) => {
+    try {
+      await axios.patch(`http://localhost:5000/api/admin/events/status/${id}`, { status: "Approved" }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEvents(events.map(e => e._id === id ? { ...e, status: "Approved" } : e));
+    } catch (err) {
+      alert("Approval failed.");
+    }
+  };
+
+
+  const handleApproveProduct = async (id) => {
+    try {
+      await axios.patch(`http://localhost:5000/api/admin/products/status/${id}`, { status: "Approved" }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProducts(products.map(p => p._id === id ? { ...p, status: "Approved" } : p));
+      alert("Product Approved");
+    } catch (err) {
+      alert("Approval failed.");
+    }
+  };
+
+  const handleUpdatePayoutStatus = async (id, status) => {
+    try {
+      await axios.patch(`http://localhost:5000/api/admin/payouts/${id}`, { status }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPayouts(payouts.map(p => p._id === id ? { ...p, status } : p));
+      alert(`Payout ${status}`);
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.message;
+      console.error("Payout Update Error:", err);
+      alert(`Status update failed: ${errMsg}`);
+    }
+  };
+
   const handleUpdateCommission = async () => {
+
     try {
       setIsUpdatingCommission(true);
       await axios.put("http://localhost:5000/api/admin/config", 
@@ -316,8 +374,9 @@ const AdminHome = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex gap-2 p-1.5 bg-slate-900/80 border border-white/5 rounded-[1.5rem] w-fit">
-                    {["events", "users", "organizers"].map((tab) => (
+                    {["events", "products", "payouts", "users", "organizers"].map((tab) => (
                         <button
+
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
@@ -331,14 +390,31 @@ const AdminHome = () => {
                     ))}
                 </div>
                 
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder={`Search ${activeTab}...`} 
-                        className="bg-slate-900/60 border border-white/10 rounded-[1.5rem] pl-12 pr-6 py-3.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none w-80 transition-all backdrop-blur-xl"
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                <div className="relative flex items-center gap-4">
+                    <div className="flex gap-1 p-1 bg-slate-900 border border-white/5 rounded-xl h-fit">
+                        {["All", "Pending", "Approved", "Rejected"].map((filt) => (
+                            <button
+                                key={filt}
+                                onClick={() => setStatusFilter(filt)}
+                                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    statusFilter === filt 
+                                    ? "bg-slate-700 text-white shadow-lg" 
+                                    : "text-slate-500 hover:text-slate-300"
+                                }`}
+                            >
+                                {filt}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <input 
+                            type="text" 
+                            placeholder={`Search ${activeTab}...`} 
+                            className="bg-slate-900/60 border border-white/10 rounded-[1.5rem] pl-12 pr-6 py-3.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none w-64 transition-all backdrop-blur-xl"
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -358,7 +434,11 @@ const AdminHome = () => {
                     {/* Render Events */}
                     {activeTab === 'events' && events.length > 0 ? (
                       events
-                      .filter(ev => ev.title.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .filter(ev => {
+                        const matchesSearch = ev.title.toLowerCase().includes(searchTerm.toLowerCase());
+                        const matchesStatus = statusFilter === "All" || ev.status === statusFilter;
+                        return matchesSearch && matchesStatus;
+                      })
                       .map((event) => (
                       <tr key={event._id} className="hover:bg-blue-600/[0.03] transition-colors group">
                         <td className="px-10 py-6">
@@ -372,18 +452,65 @@ const AdminHome = () => {
                         </td>
                         <td className="px-10 py-6 text-xs text-slate-400 font-bold">{event.category}</td>
                         <td className="px-10 py-6">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border ${event.status === 'Published' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-orange-500/10 text-orange-500 border-orange-500/20'}`}>
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border ${event.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : event.status === 'Pending' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
                             {event.status}
                           </span>
                         </td>
                         <td className="px-10 py-6 text-right">
-                          <button onClick={() => handleDelete(event._id)} className="p-3 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all">
-                            <Trash2 size={20} />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                             {event.status === 'Pending' && (
+                               <button onClick={() => handleApproveEvent(event._id)} className="p-3 text-emerald-500 hover:bg-emerald-500/10 rounded-2xl transition-all" title="Approve">
+                                 <CheckCircle size={20} />
+                               </button>
+                             )}
+                             <button onClick={() => handleDeleteEvent(event._id)} className="p-3 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all" title="Delete">
+                               <Trash2 size={20} />
+                             </button>
+                          </div>
                         </td>
                       </tr>
                     ))) : (
                         activeTab === 'events' && <tr><td colSpan="4" className="px-10 py-20 text-center text-slate-600 font-bold italic">No events found in registry.</td></tr>
+                    )}
+
+                    {/* Render Products */}
+                    {activeTab === 'products' && products.length > 0 ? (
+                      products
+                      .filter(p => {
+                        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+                        const matchesStatus = statusFilter === "All" || (p.status || "Pending") === statusFilter;
+                        return matchesSearch && matchesStatus;
+                      })
+                      .map((product) => (
+                      <tr key={product._id} className="hover:bg-blue-600/[0.03] transition-colors group">
+                        <td className="px-10 py-6">
+                          <div className="flex items-center gap-5">
+                            <img src={product.image} className="w-16 h-12 object-cover rounded-2xl border border-white/10 shadow-xl group-hover:scale-110 transition-transform" alt="" />
+                            <div>
+                                <p className="font-black text-sm text-slate-100">{product.name}</p>
+                                <p className="text-[10px] text-slate-500 font-bold mt-1.5 uppercase tracking-tighter italic">by {product.artist}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-10 py-6 text-xs text-slate-400 font-bold">{product.category}</td>
+                        <td className="px-10 py-6">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border ${product.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : product.status === 'Pending' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                            {product.status || 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-10 py-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                             {(product.status === 'Pending' || !product.status) && (
+                               <button onClick={() => handleApproveProduct(product._id)} className="p-3 text-emerald-500 hover:bg-emerald-500/10 rounded-2xl transition-all" title="Approve">
+                                 <CheckCircle size={20} />
+                               </button>
+                             )}
+
+                          </div>
+                        </td>
+                      </tr>
+                    ))) : (
+                        activeTab === 'products' && <tr><td colSpan="4" className="px-10 py-20 text-center text-slate-600 font-bold italic">No products found in registry.</td></tr>
                     )}
 
                     {/* Render Users */}
@@ -450,7 +577,54 @@ const AdminHome = () => {
                     ))) : (
                         activeTab === 'organizers' && <tr><td colSpan="4" className="px-10 py-20 text-center text-slate-600 font-bold italic">No partners currently registered.</td></tr>
                     )}
+                    {/* Render Payouts */}
+                    {activeTab === 'payouts' && payouts.length > 0 ? (
+                      payouts
+                      .filter(p => (p.organizer?.organizerName || "").toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map((p) => (
+                      <tr key={p._id} className="hover:bg-blue-600/[0.03] transition-colors group">
+                        <td className="px-10 py-6">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-orange-500/10 text-orange-500 rounded-xl">
+                                    <IndianRupee size={20} />
+                                </div>
+                                <div>
+                                    <p className="font-black text-sm text-slate-100">Rs. {p.amount.toLocaleString()}</p>
+                                    <p className="text-[10px] text-slate-500 font-bold mt-1">Requested on {new Date(p.requestedAt).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td className="px-10 py-6">
+                            <div>
+                                <p className="text-xs font-black text-slate-300">{p.organizer?.organizerName}</p>
+                                <p className="text-[10px] text-slate-500 font-bold">{p.organizer?.organizerEmail}</p>
+                            </div>
+                        </td>
+                        <td className="px-10 py-6">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border ${p.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : p.status === 'Pending' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="px-10 py-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                             {p.status === 'Pending' && (
+                               <>
+                                 <button onClick={() => handleUpdatePayoutStatus(p._id, "Approved")} className="p-3 text-emerald-500 hover:bg-emerald-500/10 rounded-2xl transition-all" title="Approve">
+                                   <CheckCircle size={20} />
+                                 </button>
+                                 <button onClick={() => handleUpdatePayoutStatus(p._id, "Rejected")} className="p-3 text-red-500 hover:bg-red-500/10 rounded-2xl transition-all" title="Reject">
+                                   <XCircle size={20} />
+                                 </button>
+                               </>
+                             )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))) : (
+                        activeTab === 'payouts' && <tr><td colSpan="4" className="px-10 py-20 text-center text-slate-600 font-bold italic">No payout requests pending.</td></tr>
+                    )}
                   </tbody>
+
                 </table>
               </div>
             </div>

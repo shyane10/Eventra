@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import your controllers
 const adminController = require("../controller/adminController");
+const { getAllPayoutRequests, updatePayoutStatus } = require("../controller/payoutController");
 
 // Import Middleware
 const { verifyToken, isAdmin } = require("../middlewear/authorization");
@@ -20,6 +21,24 @@ router.get("/events", verifyToken, isAdmin, adminController.getAllEvents);
 
 // DELETE /api/admin/events/:id (Force delete an event)
 router.delete("/events/:id", verifyToken, isAdmin, adminController.deleteEvent);
+
+// PATCH /api/admin/events/status/:id (Approve/Reject event)
+router.patch("/events/status/:id", verifyToken, isAdmin, adminController.updateEventStatus);
+
+// --- PRODUCT MANAGEMENT ---
+// GET /api/admin/products
+router.get("/products", verifyToken, isAdmin, adminController.getAllProducts);
+
+// PATCH /api/admin/products/status/:id
+router.patch("/products/status/:id", verifyToken, isAdmin, adminController.updateProductStatus);
+
+
+// --- PAYOUT MANAGEMENT ---
+// GET /api/admin/payouts
+router.get("/payouts", verifyToken, isAdmin, getAllPayoutRequests);
+
+// PATCH /api/admin/payouts/:id
+router.patch("/payouts/:id", verifyToken, isAdmin, updatePayoutStatus);
 
 // --- USER MANAGEMENT ---
 // GET /api/admin/users

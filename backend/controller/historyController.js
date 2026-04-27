@@ -147,6 +147,7 @@ exports.getOrganizerRevenueData = async (req, res) => {
   }
 };
 
+const PayoutRequest = require("../models/payoutRequestModel");
 // 6. Get Detailed Organizer Stats (Counts & Totals)
 exports.getOrganizerStats = async (req, res) => {
   try {
@@ -161,7 +162,7 @@ exports.getOrganizerStats = async (req, res) => {
       status: "Confirmed" 
     });
     
-    const ticketRevenue = bookings.reduce((sum, b) => sum + b.totalPaid, 0);
+    const grossTicketRevenue = bookings.reduce((sum, b) => sum + b.totalPaid, 0);
     const totalAttendees = bookings.reduce((sum, b) => sum + b.quantity, 0);
 
     // B. Product Stats
@@ -170,24 +171,45 @@ exports.getOrganizerStats = async (req, res) => {
     
     const allOrders = await Order.find({ status: "Confirmed" }).populate("items.product");
     
-    let productRevenue = 0;
+    let grossProductRevenue = 0;
     let productsSold = 0;
 
     allOrders.forEach(order => {
         order.items.forEach(item => {
-            if (productIds.includes(item.product?._id.toString())) {
-                productRevenue += (item.price * item.quantity);
+            if (item.product && productIds.includes(item.product._id.toString())) {
+                grossProductRevenue += (item.price * item.quantity);
                 productsSold += item.quantity;
             }
         });
     });
 
+    // C. Commission Calculation (30% for Organizer as requested)
+    const grossTotal = grossTicketRevenue + grossProductRevenue;
+    const totalOrganizerShare = (grossTotal * 30) / 100;
+    const totalAdminShare = (grossTotal * 70) / 100;
+
+    // D. Payout Calculations
+    const payouts = await PayoutRequest.find({ organizer: organizerId });
+    const approvedPayouts = payouts
+      .filter(p => p.status === "Approved")
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const pendingPayouts = payouts
+      .filter(p => p.status === "Pending")
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    // Available = 30% Share - (Approved + Pending)
+    const availableBalance = totalOrganizerShare - (approvedPayouts + pendingPayouts);
+
     res.status(200).json({ 
       success: true, 
       stats: {
-        ticketRevenue,
-        productRevenue,
-        totalRevenue: ticketRevenue + productRevenue,
+        ticketRevenue: grossTicketRevenue,
+        productRevenue: grossProductRevenue,
+        totalRevenue: grossTotal,
+        totalOrganizerShare, // His total 30% cut
+        availableBalance: Math.max(0, availableBalance), // Amount he can still request
+        receivedRevenue: approvedPayouts, // Amount already approved by admin
         totalAttendees,
         productsSold,
         eventCount: myEvents.length

@@ -193,7 +193,12 @@ const CreateProduct = () => {
                   <img src={p.image} className="w-20 h-20 object-cover rounded-xl" alt="" />
                   <div className="flex-1">
                     <h3 className="font-bold text-lg">{p.name}</h3>
-                    <p className="text-slate-500 text-sm">Rs. {p.price}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <p className="text-slate-500 text-sm font-medium">Rs. {p.price}</p>
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${p.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : p.status === 'Rejected' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-orange-500/10 text-orange-500 border-orange-500/20'}`}>
+                        {p.status || 'Pending'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button 
